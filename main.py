@@ -1,38 +1,51 @@
 import socket
 import threading
+from someClasses import *
+import json
 
 
+# server config
 HEADER = 20
 IP_ADDRESS = socket.gethostbyname(socket.gethostname())
-PORT = 50050
+PORT = 50551
 ADDRESS = (IP_ADDRESS, PORT)
 DISCONNECT_MESSAGE = "!DISCONNECT"
 FORMAT = "utf-8"
 
 
-server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.bind(ADDRESS)
+groups = []
 
 
-def handle_client(socket_handling_client, client_address):
-    connected = True
-    while connected:
-        message_specifying_length = socket_handling_client.recv(HEADER).decode(FORMAT)
-        if message_specifying_length:
-            message_length = int(message_specifying_length)
-            message = socket_handling_client.recv(message_length).decode(FORMAT)
-            print(message)
-            if message == DISCONNECT_MESSAGE:
-                connected = False
-    socket_handling_client.close()
+def send_messages_to_client(client_handler):
+    print("Write the message you want to send")
+    while True:
+        message = input("Message: ")
+        message = json.dumps(message)
+        client_handler.notify(message)
 
 
-def start_server():
-    working = True
+def start_server(HEADER=HEADER, IP_ADDRESS=IP_ADDRESS, PORT=PORT, DISCONNECT_MESSAGE=DISCONNECT_MESSAGE, FORMAT=FORMAT):
+
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        server.close()
+    except:
+        pass
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind(ADDRESS)
     server.listen()
+    chats_manager = ChatsManager()
+    the_only_group_for_now = Chat("first chat")
+    chats_manager.add_chat(the_only_group_for_now)
+    working = True
+
     while working:
-        socket_handling_client, client_address = server.accept()
-        thread_handling_client = threading.Thread(target=handle_client, args=(socket_handling_client, client_address))
+
+        client_socket, client_address = server.accept()
+        client_handler = ClientHandler(client_socket, chats_manager)
+        threading.Thread(target=send_messages_to_client, args=(client_handler,)).start()
+        thread_handling_client = threading.Thread(target=client_handler.receive_messages)
+        the_only_group_for_now.add_participant(client_handler)
         print("New Client Added")
         thread_handling_client.start()
 
